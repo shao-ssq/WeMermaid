@@ -38,7 +38,7 @@ export async function POST(request) {
       finalConfig = {
         apiUrl: process.env.AI_API_URL,
         apiKey: process.env.AI_API_KEY,
-        modelName: selectedModel || process.env.AI_MODEL_NAME
+        modelName: process.env.AI_MODEL_NAME
       };
     }
 
