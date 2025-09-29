@@ -6,32 +6,16 @@ import {Tabs, TabsContent, TabsList, TabsTrigger} from "@/components/ui/tabs";
 import {Button} from "@/components/ui/button";
 import {
     Wand2,
-    Monitor,
-    FileImage,
-    RotateCcw,
-    Maximize,
-    Move, Download
 } from "lucide-react";
-import {SettingsDialog} from "@/components/settings-dialog";
 import {TextInput} from "@/components/text-input";
 import {FileUpload} from "@/components/file-upload";
 import {DiagramTypeSelector} from "@/components/diagram-type-selector";
 import {ModelSelector} from "@/components/model-selector";
 import {MermaidEditor} from "@/components/mermaid-editor";
 import {MermaidRenderer} from "@/components/mermaid-renderer";
-// import { ExcalidrawRenderer } from "@/components/excalidraw-renderer";
 import {generateMermaidFromText} from "@/lib/ai-service";
 import {isWithinCharLimit} from "@/lib/utils";
-import {isPasswordVerified, hasCustomAIConfig} from "@/lib/config-service";
 import {autoFixMermaidCode, toggleMermaidDirection} from "@/lib/mermaid-fixer";
-import {
-    Dialog,
-    DialogContent,
-    DialogHeader,
-    DialogTitle,
-    DialogDescription,
-    DialogFooter
-} from "@/components/ui/dialog";
 import dynamic from "next/dynamic";
 
 const ExcalidrawRenderer = dynamic(() => import("@/components/excalidraw-renderer"), {ssr: false});
@@ -53,12 +37,6 @@ export default function Home() {
     const [isGenerating, setIsGenerating] = useState(false);
     const [streamingContent, setStreamingContent] = useState("");
     const [isStreaming, setIsStreaming] = useState(false);
-    const [remainingUsage, setRemainingUsage] = useState(5);
-    const [showLimitDialog, setShowLimitDialog] = useState(false);
-    const [showSettingsDialog, setShowSettingsDialog] = useState(false);
-    const [showContactDialog, setShowContactDialog] = useState(false);
-    const [passwordVerified, setPasswordVerified] = useState(false);
-    const [hasCustomConfig, setHasCustomConfig] = useState(false);
     const fitRef = useRef(null)
 
     // 新增状态：左侧面板折叠和渲染模式
@@ -71,11 +49,6 @@ export default function Home() {
     const [hasError, setHasError] = useState(false);
 
     const maxChars = parseInt(process.env.NEXT_PUBLIC_MAX_CHARS || "20000");
-
-    useEffect(() => {
-        // Check custom AI config status
-        setHasCustomConfig(hasCustomAIConfig());
-    }, []);
 
     const handleTextChange = (text) => {
         setInputText(text);
@@ -95,23 +68,6 @@ export default function Home() {
 
     const handleStreamChunk = (chunk) => {
         setStreamingContent(prev => prev + chunk);
-    };
-
-    const handleSettingsClick = () => {
-        setShowSettingsDialog(true);
-    };
-
-    const handleContactClick = () => {
-        setShowContactDialog(true);
-    };
-
-    const handlePasswordVerified = (verified) => {
-        setPasswordVerified(verified);
-    };
-
-    const handleConfigUpdated = () => {
-        // 重新检查自定义配置状态
-        setHasCustomConfig(hasCustomAIConfig());
     };
 
     // 处理错误状态变化
@@ -224,9 +180,6 @@ export default function Home() {
                 return;
             }
 
-            // 只有在API调用成功后才增加使用量
-            setRemainingUsage(getRemainingUsage());
-
             setMermaidCode(generatedCode);
             toast.success("图表生成成功");
         } catch (error) {
@@ -331,26 +284,22 @@ export default function Home() {
                         <div className={`${
                             isLeftPanelCollapsed ? 'col-span-1' : 'col-span-1 md:col-span-2'
                         } flex flex-col h-full overflow-hidden`}>
-                            {/* 控制按钮栏 - 固定高度 */}
-                            <div className="h-12 flex justify-between items-center flex-shrink-0">
-                                <div className="flex items-center gap-2">
-
-                                </div>
-                            </div>
 
                             {/* 渲染器区域 - 占用剩余空间 */}
-                            <div className="flex-1 min-h-0 mt-4" style={{minHeight: '600px'}}>
+                            <div className="flex-1 min-h-0" style={{minHeight: '600px'}}>
                                 {renderMode === "excalidraw" ? (
                                     <ExcalidrawRenderer
                                         ref={fitRef}
                                         mermaidCode={mermaidCode}
                                         onErrorChange={handleErrorChange}
+                                        setRenderMode={setRenderMode}
                                     />
                                 ) : (
                                     <MermaidRenderer
                                         mermaidCode={mermaidCode}
                                         onChange={handleMermaidCodeChange}
                                         onErrorChange={handleErrorChange}
+                                        setRenderMode={setRenderMode}
                                     />
                                 )}
                             </div>
@@ -358,40 +307,6 @@ export default function Home() {
                     </div>
                 </div>
             </main>
-
-            {/* Settings Dialog */}
-            <SettingsDialog
-                open={showSettingsDialog}
-                onOpenChange={setShowSettingsDialog}
-                onPasswordVerified={handlePasswordVerified}
-                onConfigUpdated={handleConfigUpdated}
-            />
-
-            {/* Contact Dialog */}
-            <Dialog open={showContactDialog} onOpenChange={setShowContactDialog}>
-                <DialogContent className="sm:max-w-md">
-                    <DialogHeader>
-                        <DialogTitle>联系作者</DialogTitle>
-                        <DialogDescription>
-                            <div className="py-4">
-                                <p className="mb-2">如需更多使用次数或技术支持，请扫描下方二维码联系作者（注明目的）</p>
-                                <div className="flex justify-center my-4">
-                                    <img src="/qrcode.png" alt="联系二维码" className="w-48"/>
-                                </div>
-                                <p className="text-sm text-muted-foreground">
-                                    提示：您也可以在设置中配置自己的AI服务密钥，即可享有无限使用权限
-                                </p>
-                            </div>
-                        </DialogDescription>
-                    </DialogHeader>
-                    <DialogFooter className="sm:justify-center">
-                        <Button variant="secondary" onClick={() => setShowContactDialog(false)}>
-                            关闭
-                        </Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
-
         </div>
     );
 }

@@ -151,3 +151,49 @@
     padding-bottom: env(safe-area-inset-bottom);
   }
 }
+
+/*.Island.App-toolbar.App-toolbar–mobile,*/
+/*.excalidraw .mobile-misc-tools-container,*/
+/*.excalidraw .Island:not(.sidebar–docked)*/
+/*{*/
+/*    opacity: 0;*/
+/*    transition: opacity 0.3s ease-out .2s;*/
+/*}*/
+/*.Island.App-toolbar.App-toolbar–mobile:hover,*/
+/*.excalidraw .mobile-misc-tools-container:hover,*/
+/*.excalidraw .Island:hover*/
+/*{*/
+/*    opacity: 1;*/
+/*}*/
+.excalidraw .sidebar-trigger {
+    display: none !important;
+}
+.excalidraw .help-icon {
+    display: none !important;
+}
+
+.dropdown-menu-group{
+    display: none !important;
+}
+button[title="Open"]{
+    display: none !important;
+}
+
+button[title="Save to..."]{
+    display: none !important;
+}
+button[title="Find on canvas"]{
+    display: none !important;
+}
+button[title="Export image..."]{
+    display: none !important;
+}
+button[title="Save to..."]{
+    display: none !important;
+}
+button[title="Help"] {
+    display: none !important;
+}
+div[style*="height: 1px"][style*="background-color: var(--default-border-color)"] {
+    display: none !important;
+}

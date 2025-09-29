@@ -26,7 +26,6 @@ export default function RootLayout({ children }) {
       >
         <ThemeProvider defaultTheme="system" storageKey="theme">
           {children}
-          <Toaster />
         </ThemeProvider>
       </body>
     </html>

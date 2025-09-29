@@ -24,14 +24,13 @@ const Excalidraw = dynamic(
 );
 
 
-const ExcalidrawRenderer = forwardRef(({mermaidCode, onErrorChange}, ref) => {
+const ExcalidrawRenderer = forwardRef(({mermaidCode, onErrorChange,setRenderMode,renderMode}, ref) => {
     const [excalidrawElements, setExcalidrawElements] = useState([]);
     const [excalidrawFiles, setExcalidrawFiles] = useState({});
     const [excalidrawAPI, setExcalidrawAPI] = useState(null);
     const [isRendering, setIsRendering] = useState(false);
     const [renderError, setRenderError] = useState(null);
     const [isFullscreen, setIsFullscreen] = useState(false);
-    const [renderMode, setRenderMode] = useState("excalidraw"); // "excalidraw" | "mermaid"
 
     // 监听全局事件
     useEffect(() => {
@@ -187,7 +186,7 @@ const ExcalidrawRenderer = forwardRef(({mermaidCode, onErrorChange}, ref) => {
     return (
         <div className={`${isFullscreen ? 'fixed inset-0 z-50 bg-background' : 'h-full'} flex flex-col`}>
             {/* 控制栏 - 固定高度 */}
-            <div className="h-12 flex justify-between items-center px-2 flex-shrink-0">
+            <div className="h-12 flex justify-between items-center flex-shrink-0">
                 <Button
                     variant="outline"
                     size="sm"
@@ -283,7 +282,8 @@ const ExcalidrawRenderer = forwardRef(({mermaidCode, onErrorChange}, ref) => {
                                 viewBackgroundColor: "#fafafa",
                                 currentItemFontFamily: 1,
                             },
-                        }}
+                        }
+                    }
                         excalidrawAPI={(api) => setExcalidrawAPI(api)}
                     >
                         <Footer>
