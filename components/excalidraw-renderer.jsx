@@ -31,6 +31,7 @@ const ExcalidrawRenderer = forwardRef(({mermaidCode, onErrorChange}, ref) => {
     const [isRendering, setIsRendering] = useState(false);
     const [renderError, setRenderError] = useState(null);
     const [isFullscreen, setIsFullscreen] = useState(false);
+    const [renderMode, setRenderMode] = useState("excalidraw"); // "excalidraw" | "mermaid"
 
     // 监听全局事件
     useEffect(() => {
@@ -110,6 +111,7 @@ const ExcalidrawRenderer = forwardRef(({mermaidCode, onErrorChange}, ref) => {
     }, [renderMermaidContent]);
 
     useImperativeHandle(ref,()=>({handleFitToScreen, excalidrawAPI,excalidrawElements}))
+    useImperativeHandle(ref,()=>({handleDownload, excalidrawAPI,excalidrawElements,excalidrawFiles}))
 
     // 缩放功能
     const handleZoomIn = () => {
@@ -142,6 +144,10 @@ const ExcalidrawRenderer = forwardRef(({mermaidCode, onErrorChange}, ref) => {
                 fitToContent: true,
             });
         }
+    };
+
+    const toggleRenderMode = () => {
+        setRenderMode(prev => prev === "excalidraw" ? "mermaid" : "excalidraw");
     };
 
     const handleDownload = async () => {
@@ -182,7 +188,25 @@ const ExcalidrawRenderer = forwardRef(({mermaidCode, onErrorChange}, ref) => {
         <div className={`${isFullscreen ? 'fixed inset-0 z-50 bg-background' : 'h-full'} flex flex-col`}>
             {/* 控制栏 - 固定高度 */}
             <div className="h-12 flex justify-between items-center px-2 flex-shrink-0">
-                <h3 className="text-sm font-medium">Excalidraw 图表</h3>
+                <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={toggleRenderMode}
+                    className="h-9"
+                >
+                    {renderMode === "excalidraw" ? (
+                        <>
+                            <FileImage className="h-4 w-4"/>
+                            <span className="hidden sm:inline ml-2">Mermaid</span>
+                        </>
+                    ) : (
+                        <>
+                            <Monitor className="h-4 w-4"/>
+                            <span className="hidden sm:inline ml-2">Excalidraw</span>
+                        </>
+                    )}
+                </Button>
+
                 <div className="flex gap-2">
                     {/* 适应窗口 */}
                     <Button

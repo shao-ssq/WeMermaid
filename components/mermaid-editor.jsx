@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from "react";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
-import { Copy, Check, Wand2, RotateCw } from "lucide-react";
+import {Copy, Check, Wand2, RotateCw, Maximize, RotateCcw} from "lucide-react";
 import { copyToClipboard } from "@/lib/utils";
 import { autoFixMermaidCode, toggleMermaidDirection } from "@/lib/mermaid-fixer";
 import { toast } from "sonner";
@@ -44,6 +44,7 @@ export function MermaidEditor({ code, onChange, streamingContent, isStreaming, e
   const [copied, setCopied] = useState(false);
   const [isFixing, setIsFixing] = useState(false);
   const [fixingContent, setFixingContent] = useState("");
+  const [isHorizontal, setIsHorizontal] = useState(true);
 
   const handleChange = (e) => {
     onChange(e.target.value);
@@ -119,7 +120,7 @@ export function MermaidEditor({ code, onChange, streamingContent, isStreaming, e
     const toggledCode = toggleMermaidDirection(code);
     if (toggledCode !== code) {
       onChange(toggledCode);
-      toast.success("图表方向已切换");
+      setIsHorizontal(!isHorizontal);
     } else {
       toast.info("未检测到可切换的方向");
     }
@@ -170,8 +171,20 @@ export function MermaidEditor({ code, onChange, streamingContent, isStreaming, e
             title="切换图表方向 (横向/纵向)"
           >
             <RotateCw className="h-3 w-3" />
-            <span className="hidden sm:inline">切换方向</span>
+            <span className="hidden sm:inline">{isHorizontal ? "横向" : "纵向"}</span>
           </Button>
+            <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                    window.dispatchEvent(new CustomEvent('resetView'));
+                }}
+                className="h-7 gap-1 text-xs"
+                title="重绘视图"
+            >
+                <RotateCcw className="h-3 w-3"/>
+                <span className="hidden sm:inline">重绘</span>
+            </Button>
 
           <Button
             variant="outline"
@@ -188,10 +201,22 @@ export function MermaidEditor({ code, onChange, streamingContent, isStreaming, e
             ) : (
               <>
                 <Copy className="h-3 w-3" />
-                复制代码
+                复制
               </>
             )}
           </Button>
+            <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                    window.dispatchEvent(new CustomEvent('toggleFullscreen'));
+                }}
+                className="h-7 gap-1 text-xs"
+                title="全屏显示"
+            >
+                <Maximize className="h-4 w-4"/>
+            </Button>
+
         </div>
       </div>
 

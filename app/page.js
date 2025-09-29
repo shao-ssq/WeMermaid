@@ -3,18 +3,14 @@
 import {useState, useEffect, useCallback, useRef} from "react";
 import {toast} from "sonner";
 import {Tabs, TabsContent, TabsList, TabsTrigger} from "@/components/ui/tabs";
-import {Card, CardContent} from "@/components/ui/card";
 import {Button} from "@/components/ui/button";
 import {
     Wand2,
-    PanelLeftClose,
-    PanelLeftOpen,
     Monitor,
     FileImage,
     RotateCcw,
     Maximize,
-    RotateCw,
-    Move
+    Move, Download
 } from "lucide-react";
 import {SettingsDialog} from "@/components/settings-dialog";
 import {TextInput} from "@/components/text-input";
@@ -26,7 +22,7 @@ import {MermaidRenderer} from "@/components/mermaid-renderer";
 // import { ExcalidrawRenderer } from "@/components/excalidraw-renderer";
 import {generateMermaidFromText} from "@/lib/ai-service";
 import {isWithinCharLimit} from "@/lib/utils";
-import {isPasswordVerified, hasCustomAIConfig, hasUnlimitedAccess} from "@/lib/config-service";
+import {isPasswordVerified, hasCustomAIConfig} from "@/lib/config-service";
 import {autoFixMermaidCode, toggleMermaidDirection} from "@/lib/mermaid-fixer";
 import {
     Dialog,
@@ -41,43 +37,6 @@ import dynamic from "next/dynamic";
 const ExcalidrawRenderer = dynamic(() => import("@/components/excalidraw-renderer"), {ssr: false});
 
 const usageLimit = parseInt(process.env.NEXT_PUBLIC_DAILY_USAGE_LIMIT || "5");
-
-// Usage tracking functions
-const checkUsageLimit = () => {
-    const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD format
-    const usageData = JSON.parse(localStorage.getItem('usageData') || '{}');
-    const todayUsage = usageData[today] || 0;
-    return todayUsage < usageLimit; // Return true if within limit
-};
-
-const incrementUsage = () => {
-    const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD format
-    const usageData = JSON.parse(localStorage.getItem('usageData') || '{}');
-
-    if (!usageData[today]) {
-        usageData[today] = 0;
-    }
-
-    usageData[today] += 1;
-    localStorage.setItem('usageData', JSON.stringify(usageData));
-};
-
-const checkAndIncrementUsage = () => {
-    const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD format
-    const usageData = JSON.parse(localStorage.getItem('usageData') || '{}');
-
-    if (!usageData[today]) {
-        usageData[today] = 0;
-    }
-
-    if (usageData[today] >= usageLimit) {
-        return false; // Limit exceeded
-    }
-
-    usageData[today] += 1;
-    localStorage.setItem('usageData', JSON.stringify(usageData));
-    return true; // Within limit
-};
 
 const getRemainingUsage = () => {
     const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD format
@@ -114,10 +73,6 @@ export default function Home() {
     const maxChars = parseInt(process.env.NEXT_PUBLIC_MAX_CHARS || "20000");
 
     useEffect(() => {
-        // Update remaining usage count on component mount
-        setRemainingUsage(getRemainingUsage());
-        // Check password verification status
-        setPasswordVerified(isPasswordVerified());
         // Check custom AI config status
         setHasCustomConfig(hasCustomAIConfig());
     }, []);
@@ -168,11 +123,6 @@ export default function Home() {
     // 切换左侧面板
     const toggleLeftPanel = () => {
         setIsLeftPanelCollapsed(!isLeftPanelCollapsed);
-    };
-
-    // 切换渲染模式
-    const toggleRenderMode = () => {
-        setRenderMode(prev => prev === "excalidraw" ? "mermaid" : "excalidraw");
     };
 
     // 使用useCallback优化ModelSelector的回调
@@ -253,17 +203,6 @@ export default function Home() {
             return;
         }
 
-        // 检查是否有无限量权限（密码验证通过或有自定义AI配置）
-        const hasUnlimited = hasUnlimitedAccess();
-
-        // 如果没有无限量权限，则检查使用限制（但不增加使用量）
-        if (!hasUnlimited) {
-            if (!checkUsageLimit()) {
-                setShowLimitDialog(true);
-                return;
-            }
-        }
-
         setIsGenerating(true);
         setIsStreaming(true);
         setStreamingContent("");
@@ -286,10 +225,7 @@ export default function Home() {
             }
 
             // 只有在API调用成功后才增加使用量
-            if (!hasUnlimited) {
-                incrementUsage();
-                setRemainingUsage(getRemainingUsage());
-            }
+            setRemainingUsage(getRemainingUsage());
 
             setMermaidCode(generatedCode);
             toast.success("图表生成成功");
@@ -398,59 +334,7 @@ export default function Home() {
                             {/* 控制按钮栏 - 固定高度 */}
                             <div className="h-12 flex justify-between items-center flex-shrink-0">
                                 <div className="flex items-center gap-2">
-                                    <Button
-                                        variant="outline"
-                                        size="sm"
-                                        onClick={toggleRenderMode}
-                                        className="h-9"
-                                    >
-                                        {renderMode === "excalidraw" ? (
-                                            <>
-                                                <FileImage className="h-4 w-4"/>
-                                                <span className="hidden sm:inline ml-2">Mermaid</span>
-                                            </>
-                                        ) : (
-                                            <>
-                                                <Monitor className="h-4 w-4"/>
-                                                <span className="hidden sm:inline ml-2">Excalidraw</span>
-                                            </>
-                                        )}
-                                    </Button>
 
-                                    <Button
-                                        variant="outline"
-                                        size="sm"
-                                        onClick={() => {
-                                            window.dispatchEvent(new CustomEvent('resetView'));
-                                        }}
-                                        className="h-9"
-                                        title="重置视图"
-                                    >
-                                        <RotateCcw className="h-4 w-4"/>
-                                    </Button>
-
-                                    <Button
-                                        variant="outline"
-                                        size="sm"
-                                        onClick={() => {
-                                            window.dispatchEvent(new CustomEvent('toggleFullscreen'));
-                                        }}
-                                        className="h-9"
-                                        title="全屏显示"
-                                    >
-                                        <Maximize className="h-4 w-4"/>
-                                    </Button>
-                                    <Button
-                                        variant="outline"
-                                        size="sm"
-                                        onClick={() => fitRef.current.handleFitToScreen()}
-                                        className="h-7 gap-1 text-xs px-2"
-                                        title="适应窗口"
-                                        disabled={!fitRef.current?.excalidrawAPI || fitRef.current?.excalidrawElements.length === 0}
-                                    >
-                                        <Move className="h-3.5 w-3.5"/>
-                                        <span className="hidden sm:inline">适应</span>
-                                    </Button>
                                 </div>
                             </div>
 
@@ -508,32 +392,6 @@ export default function Home() {
                 </DialogContent>
             </Dialog>
 
-            {/* Usage Limit Dialog */}
-            <Dialog open={showLimitDialog} onOpenChange={setShowLimitDialog}>
-                <DialogContent className="sm:max-w-md">
-                    <DialogHeader>
-                        <DialogTitle>使用次数已达上限</DialogTitle>
-                        <DialogDescription>
-                            <div className="py-4">
-                                <p className="mb-2">您今日的使用次数已达上限 ({usageLimit}次/天)</p>
-                                <p className="mb-4">如需更多使用次数，您可以：</p>
-                                <ul className="list-disc list-inside space-y-2 text-sm mb-4">
-                                    <li>扫描下方二维码联系作者（注明目的）</li>
-                                    <li>在设置中配置您自己的AI服务密钥</li>
-                                </ul>
-                                <div className="flex justify-center my-4">
-                                    <img src="/qrcode.png" alt="联系二维码" className="w-48"/>
-                                </div>
-                            </div>
-                        </DialogDescription>
-                    </DialogHeader>
-                    <DialogFooter className="sm:justify-center">
-                        <Button variant="secondary" onClick={() => setShowLimitDialog(false)}>
-                            关闭
-                        </Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
         </div>
     );
 }

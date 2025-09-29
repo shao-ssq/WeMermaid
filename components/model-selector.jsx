@@ -39,15 +39,6 @@ export function ModelSelector({ onModelChange }) {
       try {
         setIsLoading(true);
         
-        // 检查用户权限
-        const access = hasUnlimitedAccess();
-        setHasAccess(access);
-        
-        if (!access) {
-          setIsLoading(false);
-          return;
-        }
-
         // 获取可用模型
         const models = await getAvailableModels();
         setAvailableModels(models);
