@@ -10,8 +10,10 @@ const nextConfig = {
     devIndicators: false,
 
     // 服务器外部包配置
-    serverExternalPackages: []
+    serverExternalPackages: [],
+    compiler: {
+        removeConsole: true,
+    },
 };
-
 export default nextConfig;
 
