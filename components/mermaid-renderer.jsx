@@ -381,12 +381,12 @@ export function MermaidRenderer({mermaidCode, onChange, onErrorChange, setRender
                     {renderMode === "excalidraw" ? (
                         <>
                             <FileImage className="h-4 w-4"/>
-                            <span className="hidden sm:inline ml-2">Mermaid</span>
+                            <span className="hidden sm:inline ml-2">Excalidraw</span>
                         </>
                     ) : (
                         <>
                             <Monitor className="h-4 w-4"/>
-                            <span className="hidden sm:inline ml-2">Excalidraw</span>
+                            <span className="hidden sm:inline ml-2">Mermaid</span>
                         </>
                     )}
                 </Button>
@@ -513,4 +513,4 @@ export function MermaidRenderer({mermaidCode, onChange, onErrorChange, setRender
             </div>
         </div>
     );
-} 
+}
