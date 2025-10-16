@@ -13,10 +13,12 @@ import {DiagramTypeSelector} from "@/components/diagram-type-selector";
 import {ModelSelector} from "@/components/model-selector";
 import {MermaidEditor} from "@/components/mermaid-editor";
 import {MermaidRenderer} from "@/components/mermaid-renderer";
+import { HistoryList } from "@/components/history-list";
 import {generateMermaidFromText} from "@/lib/ai-service";
 import {isWithinCharLimit} from "@/lib/utils";
 import {autoFixMermaidCode, toggleMermaidDirection} from "@/lib/mermaid-fixer";
 import dynamic from "next/dynamic";
+import {addHistoryEntry, getHistory} from "@/lib/history-service";
 
 const ExcalidrawRenderer = dynamic(() => import("@/components/excalidraw-renderer"), {ssr: false});
 
@@ -38,6 +40,7 @@ export default function Home() {
     const [streamingContent, setStreamingContent] = useState("");
     const [isStreaming, setIsStreaming] = useState(false);
     const fitRef = useRef(null)
+    const [historyEntries, setHistoryEntries] = useState([]);
 
     // 新增状态：左侧面板折叠和渲染模式
     const [isLeftPanelCollapsed, setIsLeftPanelCollapsed] = useState(false);
@@ -49,6 +52,10 @@ export default function Home() {
     const [hasError, setHasError] = useState(false);
 
     const maxChars = parseInt(process.env.NEXT_PUBLIC_MAX_CHARS || "20000");
+
+    useEffect(() => {
+        setHistoryEntries(getHistory());
+    }, []);
 
     const handleTextChange = (text) => {
         setInputText(text);
@@ -181,6 +188,10 @@ export default function Home() {
             }
 
             setMermaidCode(generatedCode);
+            try {
+                addHistoryEntry({ inputText, mermaidCode: generatedCode, diagramType });
+                setHistoryEntries(getHistory());
+            } catch {}
             toast.success("图表生成成功");
         } catch (error) {
             console.error("Generation error:", error);
@@ -214,6 +225,7 @@ export default function Home() {
                                         <TabsTrigger value="manual"
                                                      className="flex-1 md:flex-none">手动输入</TabsTrigger>
                                         <TabsTrigger value="file" className="flex-1 md:flex-none">文件上传</TabsTrigger>
+                                        <TabsTrigger value="history" className="flex-1 md:flex-none">历史记录</TabsTrigger>
                                     </TabsList>
                                     <div className="flex items-center gap-2 w-full md:w-auto flex-wrap">
                                         <ModelSelector onModelChange={handleModelChange}/>
@@ -239,6 +251,16 @@ export default function Home() {
                                         </TabsContent>
                                         <TabsContent value="file" className="h-full mt-0">
                                             <FileUpload onTextExtracted={handleFileTextExtracted}/>
+                                        </TabsContent>
+                                        <TabsContent value="history" className="h-full mt-0">
+                                            <HistoryList
+                                                items={historyEntries}
+                                                onSelect={(item) => {
+                                                    setInputText(item.inputText);
+                                                    setMermaidCode(item.mermaidCode);
+                                                    setLeftTab("manual");
+                                                }}
+                                            />
                                         </TabsContent>
                                     </div>
 
