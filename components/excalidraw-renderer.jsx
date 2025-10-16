@@ -1,16 +1,16 @@
 "use client";
 
-import { useState, useEffect, useCallback, forwardRef, useImperativeHandle } from "react";
+import {useState, useEffect, useCallback, forwardRef, useImperativeHandle} from "react";
 import dynamic from "next/dynamic";
-import { parseMermaidToExcalidraw } from "@excalidraw/mermaid-to-excalidraw";
-import { toast } from "sonner";
-import { Button } from "@/components/ui/button";
+import {parseMermaidToExcalidraw} from "@excalidraw/mermaid-to-excalidraw";
+import {toast} from "sonner";
+import {Button} from "@/components/ui/button";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
 } from "@/components/ui/select";
 import {
     Dialog,
@@ -19,7 +19,7 @@ import {
     DialogTitle,
     DialogFooter,
 } from "@/components/ui/dialog";
-import { DiagramTypeSelector } from "@/components/diagram-type-selector";
+import {DiagramTypeSelector} from "@/components/diagram-type-selector";
 import {
     Download,
     ZoomIn,
@@ -29,7 +29,7 @@ import {
     Move, FileImage, Monitor
 } from "lucide-react";
 import "@excalidraw/excalidraw/index.css";
-import { convertToExcalidrawElements, exportToBlob, Footer } from "@excalidraw/excalidraw";
+import {convertToExcalidrawElements, exportToBlob, Footer} from "@excalidraw/excalidraw";
 
 // Dynamically import Excalidraw to avoid SSR issues
 const Excalidraw = dynamic(
@@ -64,12 +64,10 @@ function excalidrawToMermaid(elements, diagramType = "flowchart", direction = "T
         return classDefs.get(key);
     };
 
-    // 1️⃣ 收集文字
     elements.forEach((el) => {
         if (el.type === "text") textMap[el.id] = cleanText(el.text);
     });
 
-    // 2️⃣ 收集节点
     elements.forEach((el) => {
         if (["rectangle", "ellipse", "diamond"].includes(el.type)) {
             const textId = el.boundElements?.find((b) => b.type === "text")?.id;
@@ -143,18 +141,19 @@ function excalidrawToMermaid(elements, diagramType = "flowchart", direction = "T
 
     return lines.join("\n");
 }
+
 const DIAGRAM_TYPES = [
-  { value: "flowchart", label: "流程图" },
-  { value: "sequenceDiagram", label: "时序图" },
-  { value: "classDiagram", label: "类图" },
+    {value: "flowchart", label: "流程图"},
+    // {value: "sequenceDiagram", label: "时序图"},
+    // {value: "classDiagram", label: "类图"},
 ];
 const ExcalidrawRenderer = forwardRef(({
-    mermaidCode,
-    onErrorChange,
-    setRenderMode,
-    renderMode,
-    changeMermaidCode
-}, ref) => {
+                                           mermaidCode,
+                                           onErrorChange,
+                                           setRenderMode,
+                                           renderMode,
+                                           changeMermaidCode
+                                       }, ref) => {
     const [excalidrawElements, setExcalidrawElements] = useState([]);
     const [excalidrawFiles, setExcalidrawFiles] = useState({});
     const [excalidrawAPI, setExcalidrawAPI] = useState(null);
@@ -163,10 +162,17 @@ const ExcalidrawRenderer = forwardRef(({
     const [isFullscreen, setIsFullscreen] = useState(false);
     const [isTypeDialogOpen, setIsTypeDialogOpen] = useState(false);
     const [selectedDiagramType, setSelectedDiagramType] = useState("flowchart");
-
+    let [parentDiagramType, setParentDiagramType] = useState(false);
 
     // 监听全局事件
     useEffect(() => {
+        console.log(mermaidCode)
+        if(mermaidCode.startsWith("flowchart TD")){
+            setParentDiagramType(true)
+        }else {
+            setParentDiagramType(false)
+        }
+
         const handleResetView = () => {
             if (excalidrawAPI) {
                 excalidrawAPI.resetScene();
@@ -207,7 +213,7 @@ const ExcalidrawRenderer = forwardRef(({
         try {
             // 预处理 mermaidCode: 移除 <br> 标签
             const preprocessedCode = mermaidCode.replace(/<br\s*\/?>/gi, '');
-            const { elements, files } = await parseMermaidToExcalidraw(preprocessedCode);
+            const {elements, files} = await parseMermaidToExcalidraw(preprocessedCode);
             const convertedElements = convertToExcalidrawElements(elements);
 
             setExcalidrawElements(convertedElements);
@@ -242,8 +248,8 @@ const ExcalidrawRenderer = forwardRef(({
         renderMermaidContent();
     }, [renderMermaidContent]);
 
-    useImperativeHandle(ref, () => ({ handleFitToScreen, excalidrawAPI, excalidrawElements }))
-    useImperativeHandle(ref, () => ({ handleDownload, excalidrawAPI, excalidrawElements, excalidrawFiles }))
+    useImperativeHandle(ref, () => ({handleFitToScreen, excalidrawAPI, excalidrawElements}))
+    useImperativeHandle(ref, () => ({handleDownload, excalidrawAPI, excalidrawElements, excalidrawFiles}))
 
     // 缩放功能
     const handleZoomIn = () => {
@@ -335,12 +341,12 @@ const ExcalidrawRenderer = forwardRef(({
                 >
                     {renderMode === "excalidraw" ? (
                         <>
-                            <FileImage className="h-4 w-4" />
+                            <FileImage className="h-4 w-4"/>
                             <span className="hidden sm:inline ml-2">Mermaid</span>
                         </>
                     ) : (
                         <>
-                            <Monitor className="h-4 w-4" />
+                            <Monitor className="h-4 w-4"/>
                             <span className="hidden sm:inline ml-2">Excalidraw</span>
                         </>
                     )}
@@ -354,9 +360,9 @@ const ExcalidrawRenderer = forwardRef(({
                         onClick={() => setIsTypeDialogOpen(true)}
                         className="h-7 gap-1 text-xs px-2"
                         title="手动调整图像后反向更新 Mermaid Code"
-                        disabled={!excalidrawAPI}
+                        disabled={!excalidrawAPI||!parentDiagramType}
                     >
-                        <RefreshCw className="h-3.5 w-3.5" />
+                        <RefreshCw className="h-3.5 w-3.5"/>
                         <span className="hidden sm:inline">更新 Mermaid Code</span>
                     </Button>
 
@@ -369,7 +375,7 @@ const ExcalidrawRenderer = forwardRef(({
                         title="适应窗口"
                         disabled={!excalidrawAPI || excalidrawElements.length === 0}
                     >
-                        <Move className="h-3.5 w-3.5" />
+                        <Move className="h-3.5 w-3.5"/>
                         <span className="hidden sm:inline">适应</span>
                     </Button>
 
@@ -382,7 +388,7 @@ const ExcalidrawRenderer = forwardRef(({
                         disabled={!excalidrawAPI || excalidrawElements.length === 0}
                         className="h-7 gap-1 text-xs px-2"
                     >
-                        <Download className="h-3.5 w-3.5" />
+                        <Download className="h-3.5 w-3.5"/>
                         <span className="hidden sm:inline">下载</span>
                     </Button>
 
@@ -395,7 +401,7 @@ const ExcalidrawRenderer = forwardRef(({
                             className="h-7 gap-1 text-xs px-2"
                             title="退出全屏"
                         >
-                            <Minimize className="h-3.5 w-3.5" />
+                            <Minimize className="h-3.5 w-3.5"/>
                             <span className="hidden sm:inline">退出</span>
                         </Button>
                     )}
@@ -404,7 +410,8 @@ const ExcalidrawRenderer = forwardRef(({
 
             {/* 图表类型选择对话框 */}
             <Dialog open={isTypeDialogOpen} onOpenChange={setIsTypeDialogOpen}>
-                <DialogContent className="max-w-sm sm:max-w-md p-5 rounded-2xl shadow-lg border border-muted bg-background/95 backdrop-blur-md transition-all">
+                <DialogContent
+                    className="max-w-sm sm:max-w-md p-5 rounded-2xl shadow-lg border border-muted bg-background/95 backdrop-blur-md transition-all">
                     <div className="flex flex-col gap-3">
                         <DialogTitle className="text-base font-semibold text-foreground flex items-center gap-2">
                             选择生成的图表类型
@@ -413,8 +420,9 @@ const ExcalidrawRenderer = forwardRef(({
                         <div className="flex items-center justify-between mt-1">
                             <span className="text-sm text-muted-foreground">图表类型：</span>
                             <Select value={selectedDiagramType} onValueChange={setSelectedDiagramType}>
-                                <SelectTrigger id="diagram-type" className="w-40 text-sm border-muted focus:ring-2 focus:ring-primary/40">
-                                    <SelectValue placeholder="选择图表类型" />
+                                <SelectTrigger id="diagram-type"
+                                               className="w-40 text-sm border-muted focus:ring-2 focus:ring-primary/40">
+                                    <SelectValue placeholder="选择图表类型"/>
                                 </SelectTrigger>
                                 <SelectContent>
                                     {DIAGRAM_TYPES.map((type) => (

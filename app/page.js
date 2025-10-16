@@ -313,6 +313,7 @@ export default function Home() {
                                     <ExcalidrawRenderer
                                         ref={fitRef}
                                         mermaidCode={mermaidCode}
+                                        parentDiagramType = {diagramType}
                                         onErrorChange={handleErrorChange}
                                         setRenderMode={setRenderMode}
                                         changeMermaidCode={handleMermaidCodeChange}
