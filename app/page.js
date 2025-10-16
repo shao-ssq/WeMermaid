@@ -293,6 +293,7 @@ export default function Home() {
                                         mermaidCode={mermaidCode}
                                         onErrorChange={handleErrorChange}
                                         setRenderMode={setRenderMode}
+                                        changeMermaidCode={handleMermaidCodeChange}
                                     />
                                 ) : (
                                     <MermaidRenderer

@@ -9,6 +9,7 @@ import {
     Download,
     ZoomIn,
     ZoomOut,
+    RefreshCw,
     Minimize,
     Move, FileImage, Monitor
 } from "lucide-react";
@@ -23,14 +24,103 @@ const Excalidraw = dynamic(
     }
 );
 
+function excalidrawToMermaid(elements, direction = "TD", includeColors = true) {
+    const textMap = {};
+    const idMap = {};
+    const nodes = {};
+    const links = [];
+    const classDefs = new Map();
+    let idCounter = 0;
+    let colorCounter = 0;
 
-const ExcalidrawRenderer = forwardRef(({mermaidCode, onErrorChange,setRenderMode,renderMode}, ref) => {
+    const getAlphaId = () => {
+        const letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+        return letters[idCounter++] || `N${idCounter}`;
+    };
+
+    const cleanText = (t) => (t || "").replace(/\s*\n\s*/g, "").trim();
+
+    const getColorClass = (bg, stroke) => {
+        const key = `${bg}-${stroke}`;
+        if (!classDefs.has(key)) {
+            const className = `C${++colorCounter}`;
+            classDefs.set(key, className);
+        }
+        return classDefs.get(key);
+    };
+
+    // 1️⃣ 收集文字
+    elements.forEach((el) => {
+        if (el.type === "text") textMap[el.id] = cleanText(el.text);
+    });
+
+    // 2️⃣ 收集节点
+    elements.forEach((el) => {
+        if (["rectangle", "ellipse", "diamond"].includes(el.type)) {
+            const textId = el.boundElements?.find((b) => b.type === "text")?.id;
+            const text = textMap[textId] || "";
+            const alphaId = getAlphaId();
+            idMap[el.id] = alphaId;
+
+            let shape = `[${text}]`;
+            if (el.type === "ellipse") shape = `((${text}))`;
+            if (el.type === "diamond") shape = `{${text}}`;
+
+            if (includeColors) {
+                const className = getColorClass(el.backgroundColor || "white", el.strokeColor || "#1e1e1e");
+                nodes[alphaId] = `${shape}:::${className}`;
+            } else {
+                nodes[alphaId] = shape;
+            }
+        }
+    });
+
+    // 3️⃣ 收集箭头
+    elements.forEach((el) => {
+        if (el.type === "arrow") {
+            const start = idMap[el.startBinding?.elementId];
+            const end = idMap[el.endBinding?.elementId];
+            if (!start || !end) return;
+
+            const textId = el.boundElements?.find((b) => b.type === "text")?.id;
+            const label = textMap[textId] ? `|${textMap[textId]}|` : "";
+            links.push(`${start} -->${label} ${end}`);
+        }
+    });
+
+    // 4️⃣ 拼接输出（美观格式）
+    const lines = [];
+    lines.push(`flowchart ${direction}`);
+    lines.push(...Object.entries(nodes).map(([id, shape]) => `    ${id}${shape}`));
+    lines.push("");
+    lines.push(...links.map((l) => `    ${l}`));
+
+    if (includeColors && classDefs.size) {
+        lines.push("");
+        classDefs.forEach((name, key) => {
+            const [bg, stroke] = key.split("-");
+            lines.push(`    classDef ${name} fill:${bg},stroke:${stroke},stroke-width:2px;`);
+        });
+    }
+
+    return lines.join("\n");
+}
+
+
+const ExcalidrawRenderer = forwardRef(({
+                                           mermaidCode,
+                                           onErrorChange,
+                                           setRenderMode,
+                                           renderMode,
+                                           changeMermaidCode
+                                       }, ref) => {
     const [excalidrawElements, setExcalidrawElements] = useState([]);
     const [excalidrawFiles, setExcalidrawFiles] = useState({});
     const [excalidrawAPI, setExcalidrawAPI] = useState(null);
     const [isRendering, setIsRendering] = useState(false);
     const [renderError, setRenderError] = useState(null);
     const [isFullscreen, setIsFullscreen] = useState(false);
+
 
     // 监听全局事件
     useEffect(() => {
@@ -109,8 +199,8 @@ const ExcalidrawRenderer = forwardRef(({mermaidCode, onErrorChange,setRenderMode
         renderMermaidContent();
     }, [renderMermaidContent]);
 
-    useImperativeHandle(ref,()=>({handleFitToScreen, excalidrawAPI,excalidrawElements}))
-    useImperativeHandle(ref,()=>({handleDownload, excalidrawAPI,excalidrawElements,excalidrawFiles}))
+    useImperativeHandle(ref, () => ({handleFitToScreen, excalidrawAPI, excalidrawElements}))
+    useImperativeHandle(ref, () => ({handleDownload, excalidrawAPI, excalidrawElements, excalidrawFiles}))
 
     // 缩放功能
     const handleZoomIn = () => {
@@ -183,6 +273,11 @@ const ExcalidrawRenderer = forwardRef(({mermaidCode, onErrorChange,setRenderMode
         }
     };
 
+    const handGenerateMermaidCode = () => {
+        const elements = excalidrawAPI.getSceneElements();
+        changeMermaidCode(excalidrawToMermaid(elements))
+    }
+
     return (
         <div className={`${isFullscreen ? 'fixed inset-0 z-50 bg-background' : 'h-full'} flex flex-col`}>
             {/* 控制栏 - 固定高度 */}
@@ -207,6 +302,19 @@ const ExcalidrawRenderer = forwardRef(({mermaidCode, onErrorChange,setRenderMode
                 </Button>
 
                 <div className="flex gap-2">
+
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handGenerateMermaidCode}
+                        className="h-7 gap-1 text-xs px-2"
+                        title="手动调整图像后反向更新 Mermaid Code"
+                        disabled={!excalidrawAPI}
+                    >
+                        <RefreshCw className="h-3.5 w-3.5"/>
+                        <span className="hidden sm:inline">更新 Mermaid Code</span>
+                    </Button>
+
                     {/* 适应窗口 */}
                     <Button
                         variant="outline"
@@ -283,7 +391,7 @@ const ExcalidrawRenderer = forwardRef(({mermaidCode, onErrorChange,setRenderMode
                                 currentItemFontFamily: 1,
                             },
                         }
-                    }
+                        }
                         excalidrawAPI={(api) => setExcalidrawAPI(api)}
                     >
                         <Footer>

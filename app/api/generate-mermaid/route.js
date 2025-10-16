@@ -9,12 +9,12 @@ export async function POST(request) {
     }
 
     const cleanedText = cleanText(text);
-    
+
     let finalConfig;
-    
+
     // 步骤1: 检查是否有完整的aiConfig
     const hasCompleteAiConfig = aiConfig?.apiUrl && aiConfig?.apiKey && aiConfig?.modelName;
-    
+
     if (hasCompleteAiConfig) {
       // 如果有完整的aiConfig，直接使用
       finalConfig = {
@@ -28,15 +28,15 @@ export async function POST(request) {
         // 步骤3: 如果传入了accessPassword，验证是否有效
         const correctPassword = process.env.ACCESS_PASSWORD;
         const isPasswordValid = correctPassword && accessPassword === correctPassword;
-        
+
         if (!isPasswordValid) {
           // 如果密码无效，直接报错
-          return Response.json({ 
-            error: "访问密码无效" 
+          return Response.json({
+            error: "访问密码无效"
           }, { status: 401 });
         }
       }
-      
+
       // 如果没有传入accessPassword或者accessPassword有效，使用环境变量配置
       // 如果有选择的模型，使用选择的模型，否则使用默认模型
       finalConfig = {
@@ -48,27 +48,27 @@ export async function POST(request) {
 
     // 检查最终配置是否完整
     if (!finalConfig.apiUrl || !finalConfig.apiKey || !finalConfig.modelName) {
-      return Response.json({ 
-        error: "AI配置不完整，请在设置中配置API URL、API Key和模型名称" 
+      return Response.json({
+        error: "AI配置不完整，请在设置中配置API URL、API Key和模型名称"
       }, { status: 400 });
     }
 
     // 构建 prompt 根据图表类型
     let systemPrompt = `
     目的和目标：
-* 理解用户提供的输入。
+* 理解用户提供的文档的结构和逻辑关系。
 * 准确地将文档内容和关系转化为符合mermaid语法的图表代码。
 * 确保图表中包含文档的所有关键元素和它们之间的联系。
 
 行为和规则：
 1. 分析文档：
-a) 仔细阅读和分析用户的输入,如果是一篇文档，则仔细阅读和分析文档内容。如果是一个需求或者指令，则根据需求先生成一篇文档。
+a) 仔细阅读和分析用户提供的文档内容。
 b) 识别文档中的不同元素（如概念、实体、步骤、流程等）。
 c) 理解这些元素之间的各种关系（如从属、包含、流程、因果等）。
 d) 识别文档中蕴含的逻辑结构和流程。
 2. 图表生成：
     `
-    
+
     if (diagramType && diagramType !== "auto") {
       systemPrompt += `a) 请特别生成 ${diagramType} 类型的图表。`;
     } else {
@@ -113,12 +113,12 @@ b) 生成的图表代码应可以直接复制并粘贴到支持mermaid语法的�
     ];
 
     // 构建API URL
-    const url = finalConfig.apiUrl.includes("v1") || finalConfig.apiUrl.includes("v3") 
-      ? `${finalConfig.apiUrl}/chat/completions` 
+    const url = finalConfig.apiUrl.includes("v1") || finalConfig.apiUrl.includes("v3")
+      ? `${finalConfig.apiUrl}/chat/completions`
       : `${finalConfig.apiUrl}/v1/chat/completions`;
-    
-    console.log('Using AI config:', { 
-      url, 
+
+    console.log('Using AI config:', {
+      url,
       modelName: finalConfig.modelName,
       hasApiKey: !!finalConfig.apiKey,
     });
@@ -145,8 +145,8 @@ b) 生成的图表代码应可以直接复制并粘贴到支持mermaid语法的�
           if (!response.ok) {
             const errorText = await response.text();
             console.error("AI API Error:", response.status, errorText);
-            controller.enqueue(encoder.encode(JSON.stringify({ 
-              error: `AI服务返回错误 (${response.status}): ${errorText || 'Unknown error'}` 
+            controller.enqueue(encoder.encode(JSON.stringify({
+              error: `AI服务返回错误 (${response.status}): ${errorText || 'Unknown error'}`
             })));
             controller.close();
             return;
@@ -156,31 +156,31 @@ b) 生成的图表代码应可以直接复制并粘贴到支持mermaid语法的�
           const reader = response.body.getReader();
           const decoder = new TextDecoder();
           let mermaidCode = "";
-          
+
           while (true) {
             const { done, value } = await reader.read();
             if (done) break;
-            
+
             // 解析返回的数据块
             const chunk = decoder.decode(value, { stream: true });
-            
+
             // 处理数据行
             const lines = chunk.split('\n').filter(line => line.trim() !== '');
-            
+
             for (const line of lines) {
               if (line.startsWith('data: ')) {
                 const data = line.substring(6);
                 if (data === '[DONE]') continue;
-                
+
                 try {
                   const parsed = JSON.parse(data);
                   const content = parsed.choices[0]?.delta?.content || '';
                   if (content) {
                     mermaidCode += content;
                     // 发送给客户端
-                    controller.enqueue(encoder.encode(JSON.stringify({ 
+                    controller.enqueue(encoder.encode(JSON.stringify({
                       chunk: content,
-                      done: false 
+                      done: false
                     })));
                   }
                 } catch (e) {
@@ -189,22 +189,22 @@ b) 生成的图表代码应可以直接复制并粘贴到支持mermaid语法的�
               }
             }
           }
-          
+
           // 提取代码块中的内容（如果有代码块标记）
           const codeBlockMatch = mermaidCode.match(/```(?:mermaid)?\s*([\s\S]*?)```/);
           const finalCode = codeBlockMatch ? codeBlockMatch[1].trim() : mermaidCode;
-          
+
           // 发送完成信号
-          controller.enqueue(encoder.encode(JSON.stringify({ 
+          controller.enqueue(encoder.encode(JSON.stringify({
             mermaidCode: finalCode,
-            done: true 
+            done: true
           })));
-          
+
         } catch (error) {
           console.error("Streaming Error:", error);
-          controller.enqueue(encoder.encode(JSON.stringify({ 
-            error: `处理请求时发生错误: ${error.message}`, 
-            done: true 
+          controller.enqueue(encoder.encode(JSON.stringify({
+            error: `处理请求时发生错误: ${error.message}`,
+            done: true
           })));
         } finally {
           controller.close();
@@ -223,8 +223,8 @@ b) 生成的图表代码应可以直接复制并粘贴到支持mermaid语法的�
   } catch (error) {
     console.error("API Route Error:", error);
     return Response.json(
-      { error: `处理请求时发生错误: ${error.message}` }, 
+      { error: `处理请求时发生错误: ${error.message}` },
       { status: 500 }
     );
   }
-} 
+}

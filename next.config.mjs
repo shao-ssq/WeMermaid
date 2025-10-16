@@ -11,9 +11,9 @@ const nextConfig = {
 
     // 服务器外部包配置
     serverExternalPackages: [],
-    compiler: {
-        removeConsole: true,
-    },
+    // compiler: {
+    //     removeConsole: true,
+    // },
 };
 export default nextConfig;
 
