@@ -53,7 +53,7 @@ export async function POST(request) {
       }, { status: 400 });
     }
 
-    const systemPrompt = buildMermaidSystemPrompt({ diagramType: diagramType || "auto", language: "zh" });
+    const systemPrompt = buildMermaidSystemPrompt({ diagramType: diagramType || "flowchart", language: "zh" });
 
     const messages = [
       {

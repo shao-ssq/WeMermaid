@@ -35,7 +35,7 @@ const getRemainingUsage = () => {
 export default function Home() {
     const [inputText, setInputText] = useState("");
     const [mermaidCode, setMermaidCode] = useState("");
-    const [diagramType, setDiagramType] = useState("auto");
+    const [diagramType, setDiagramType] = useState("flowchart");
     const [isGenerating, setIsGenerating] = useState(false);
     const [streamingContent, setStreamingContent] = useState("");
     const [isStreaming, setIsStreaming] = useState(false);

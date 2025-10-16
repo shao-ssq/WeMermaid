@@ -10,7 +10,6 @@ import {
 } from "@/components/ui/select";
 
 const DIAGRAM_TYPES = [
-  { value: "auto", label: "自动选择" },
   { value: "flowchart", label: "流程图" },
   { value: "sequenceDiagram", label: "时序图" },
   { value: "classDiagram", label: "类图" },
