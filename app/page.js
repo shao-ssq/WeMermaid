@@ -317,6 +317,10 @@ export default function Home() {
                                         onErrorChange={handleErrorChange}
                                         setRenderMode={setRenderMode}
                                         changeMermaidCode={handleMermaidCodeChange}
+                                        changeStreamCode = {handleStreamChunk}
+                                        setIsGenerating = {setIsGenerating}
+                                        setIsStreaming = {setIsStreaming}
+                                        setStreamingContent = {setStreamingContent}
                                     />
                                 ) : (
                                     <MermaidRenderer

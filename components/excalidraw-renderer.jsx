@@ -30,6 +30,7 @@ import {
 } from "lucide-react";
 import "@excalidraw/excalidraw/index.css";
 import {convertToExcalidrawElements, exportToBlob, Footer} from "@excalidraw/excalidraw";
+import {generateMermaidFromText, optimizeMermaidCode, optimizeMermaidCodeNotStream} from "@/lib/ai-service";
 
 // Dynamically import Excalidraw to avoid SSR issues
 const Excalidraw = dynamic(
@@ -39,7 +40,7 @@ const Excalidraw = dynamic(
     }
 );
 
-function excalidrawToMermaid(elements, diagramType = "flowchart", direction = "TD", includeColors = true) {
+function excalidrawToMermaidFlowChart(elements, direction = "TD", includeColors = true) {
     const textMap = {};
     const idMap = {};
     const nodes = {};
@@ -58,93 +59,87 @@ function excalidrawToMermaid(elements, diagramType = "flowchart", direction = "T
     const getColorClass = (bg, stroke) => {
         const key = `${bg}-${stroke}`;
         if (!classDefs.has(key)) {
-            const className = `C${++colorCounter}`;
-            classDefs.set(key, className);
+            classDefs.set(key, `C${++colorCounter}`);
         }
         return classDefs.get(key);
     };
 
-    elements.forEach((el) => {
+    // 1️⃣ 收集文字内容
+    elements.forEach(el => {
         if (el.type === "text") textMap[el.id] = cleanText(el.text);
     });
 
-    elements.forEach((el) => {
+    // 2️⃣ 收集节点
+
+    const groupMap = {}; // 临时存储 groupId -> 节点列表
+
+    elements.forEach(el => {
         if (["rectangle", "ellipse", "diamond"].includes(el.type)) {
-            const textId = el.boundElements?.find((b) => b.type === "text")?.id;
+            const textId = el.boundElements?.find(b => b.type === "text")?.id;
             const text = textMap[textId] || "";
             const alphaId = getAlphaId();
             idMap[el.id] = alphaId;
 
-            if (diagramType === "flowchart") {
-                let shape = `[${text}]`;
-                if (el.type === "ellipse") shape = `((${text}))`;
-                if (el.type === "diamond") shape = `{${text}}`;
+            // 节点形状
+            let shape = `[${text}]`;
+            if (el.type === "ellipse") shape = `((${text}))`;
+            if (el.type === "diamond") shape = `{${text}}`;
 
-                nodes[alphaId] = includeColors
-                    ? `${shape}:::${getColorClass(el.backgroundColor || "white", el.strokeColor || "#1e1e1e")}`
-                    : shape;
+            nodes[alphaId] = includeColors
+                ? `${shape}:::${getColorClass(el.backgroundColor || "white", el.strokeColor || "#1e1e1e")}`
+                : shape;
 
-            } else if (diagramType === "classDiagram") {
-                nodes[alphaId] = text.replace(/[[\]{}()]/g, '');
-            } else if (diagramType === "sequenceDiagram") {
-                nodes[alphaId] = text || alphaId;
+            // 如果节点有 groupIds
+            if (el.groupIds && el.groupIds.length > 0) {
+                el.groupIds.forEach(groupId => {
+                    if (!groupMap[groupId]) groupMap[groupId] = [];
+                    groupMap[groupId].push({nodeId: alphaId, groupId});
+                });
             }
         }
     });
+    const groupList = Object.values(groupMap);
+
 
     // 3️⃣ 收集箭头
-    elements.forEach((el) => {
+    elements.forEach(el => {
         if (el.type === "arrow") {
             const start = idMap[el.startBinding?.elementId];
             const end = idMap[el.endBinding?.elementId];
             if (!start || !end) return;
 
-            const textId = el.boundElements?.find((b) => b.type === "text")?.id;
+            const textId = el.boundElements?.find(b => b.type === "text")?.id;
             const label = textMap[textId] || "";
+            const linkLabel = label ? `|${label}|` : "";
 
-            if (diagramType === "flowchart") {
-                const linkLabel = label ? `|${label}|` : "";
-                links.push(`${start} -->${linkLabel} ${end}`);
-            } else if (diagramType === "classDiagram") {
-                // 简单映射：实线箭头为继承
-                links.push(`${start} <|-- ${end}`);
-            } else if (diagramType === "sequenceDiagram") {
-                const msg = label || "";
-                links.push(`${start}->>${end}: ${msg}`);
-            }
+            links.push(`${start} -->${linkLabel} ${end}`);
         }
     });
 
     // 4️⃣ 拼接输出
-    const lines = [];
-    if (diagramType === "flowchart") {
-        lines.push(`flowchart ${direction}`);
-        lines.push(...Object.entries(nodes).map(([id, shape]) => `    ${id}${shape}`));
-        lines.push(...links.map((l) => `    ${l}`));
-    } else if (diagramType === "classDiagram") {
-        lines.push("classDiagram");
-        lines.push(...Object.values(nodes).map(n => `    class ${n}`));
-        lines.push(...links.map(l => `    ${l}`));
-    } else if (diagramType === "sequenceDiagram") {
-        lines.push("sequenceDiagram");
-        lines.push(...links.map(l => `    ${l}`));
+    const lines = [`flowchart ${direction}`];
+    for (const [id, shape] of Object.entries(nodes)) {
+        lines.push(`    ${id}${shape}`);
     }
+    links.forEach(l => lines.push(`    ${l}`));
 
-    // 颜色定义只对 flowchart 和 classDiagram 有效
-    if (includeColors && classDefs.size && diagramType !== "sequenceDiagram") {
+    // 5️⃣ 添加颜色定义
+    if (includeColors && classDefs.size) {
         lines.push("");
         classDefs.forEach((name, key) => {
             const [bg, stroke] = key.split("-");
             lines.push(`    classDef ${name} fill:${bg},stroke:${stroke},stroke-width:2px;`);
         });
     }
-
-    return lines.join("\n");
+    return {
+        code: lines.join("\n"),
+        groupList: groupList
+    };
 }
 
 const DIAGRAM_TYPES = [
     {value: "flowchart", label: "流程图"},
-    // {value: "sequenceDiagram", label: "时序图"},
+    {value: "sequenceDiagram", label: "时序图"},
     // {value: "classDiagram", label: "类图"},
 ];
 const ExcalidrawRenderer = forwardRef(({
@@ -152,7 +147,11 @@ const ExcalidrawRenderer = forwardRef(({
                                            onErrorChange,
                                            setRenderMode,
                                            renderMode,
-                                           changeMermaidCode
+                                           changeMermaidCode,
+                                           changeStreamCode,
+                                           setIsGenerating,
+                                           setIsStreaming,
+                                           setStreamingContent
                                        }, ref) => {
     const [excalidrawElements, setExcalidrawElements] = useState([]);
     const [excalidrawFiles, setExcalidrawFiles] = useState({});
@@ -166,10 +165,9 @@ const ExcalidrawRenderer = forwardRef(({
 
     // 监听全局事件
     useEffect(() => {
-        console.log(mermaidCode)
-        if(mermaidCode.startsWith("flowchart TD")){
+        if (mermaidCode.startsWith("flowchart TD")) {
             setParentDiagramType(true)
-        }else {
+        } else {
             setParentDiagramType(false)
         }
 
@@ -322,11 +320,96 @@ const ExcalidrawRenderer = forwardRef(({
         }
     };
 
-    const handGenerateMermaidCode = (diagramType = "flowchart") => {
+    const handGenerateMermaidCode = async (diagramType = "flowchart") => {
         if (!excalidrawAPI) return;
         const elements = excalidrawAPI.getSceneElements();
-        const code = excalidrawToMermaid(elements, diagramType);
-        changeMermaidCode(code);
+        setIsGenerating(true);
+        setIsStreaming(true);
+        setStreamingContent("");
+        if (diagramType === "flowchart") {
+            const {code, groupList} = excalidrawToMermaidFlowChart(elements);
+            if (groupList.length > 0) {
+                const mermaidOptimizationPrompt = `
+            请按以下要求处理并输出仅包含 Mermaid 代码（不要附带解释或注释）：
+            任务目标：
+            - 优化并精简 Mermaid 流程图代码，保持逻辑完整，不遗漏任何节点、连线或文本。
+            - 支持可选的 groupList 输入：当 groupList 为空或未提供时，不生成任何 subgraph。
+            - 当 groupList 有内容时，将属于同一 groupId 的节点自动归入对应 subgraph；生成的 subgraph 数量应与 groupList 中的 groupId 数量一致。
+            
+            输入内容：
+            1. 原始 Mermaid 代码（flowchart TD / LR 等）。
+            2. 如果groupList（JSON 数组）非空，格式示例：
+               [[{ "nodeId": "C", "groupId": "subgraph_group_移动端流程" }]]
+            
+            输出要求（严格）：
+            - 保留所有节点、连线与文本，移除重复节点、重复连线与无意义循环引用。
+            - 节点定义与文本必须紧贴（例如 A[文本]），禁止 HTML 标签或转义符（如 <br>、&lt; 等）。
+            - 使用紧凑格式：首行保留原方向（如 flowchart TD），其后每行一条连线，格式形如：
+              \`A --> B[文本]\` 或 \`D -->|条件| E[文本]\`
+            - 若 groupList 提供了 groupId，则将对应节点放入相应 subgraph 中；否则不生成任何 subgraph。
+            - 禁止重复节点定义、多次等价的 classDef；相同样式须合并为单一定义。
+            - 保留并规范化 classDef 与 class 使用，样式命名应语义化（如 success, failure, warning, process）。
+            - 移除自指或重复循环（如 B --> B），但保留必要的逻辑循环。
+            - 同名不同文本的节点需拆分为独立编号节点（如 A1, A2），并保留原连线文本。
+            - 输出不得包含空行、注释或非 Mermaid 内容，保证可直接渲染。
+            - 节点顺序保持逻辑清晰（入口节点优先），无需完全复原原文件顺序。
+            
+            输出示例（严格格式）：
+            flowchart TD
+            A[用户打开App] --> B[显示二维码]
+            B --> C[用户扫码]
+            C --> D{扫码成功?}
+            D -->|是| E[登录]
+            D -->|否| F[重试]
+            classDef success fill:#d4edda,stroke:#155724,color:#155724
+            class E success
+                `;
+                const {
+                    optimizedCode,
+                    error
+                } = await optimizeMermaidCode(code, mermaidOptimizationPrompt, changeStreamCode, groupList);
+                changeMermaidCode(optimizedCode);
+            } else {
+                const mermaidOptimizationPrompt = `
+           请按以下要求处理并输出仅包含 Mermaid 代码（不要附带解释或注释）：
+            任务目标：优化并精简 Mermaid 流程图代码，保持逻辑完整，不遗漏任何节点、连线或文本。
+            
+            输入内容：
+            1. 原始 Mermaid 代码（flowchart TD / LR 等）。
+            
+            输出要求（严格）：
+            - 保留所有节点、连线与文本，移除重复节点、重复连线与无意义循环引用。
+            - 节点定义与文本必须紧贴（例如 A[文本]），禁止 HTML 标签或转义符（如 <br>、&lt; 等）。
+            - 使用紧凑格式：首行保留原方向（如 flowchart TD），其后每行一条连线，格式形如：
+              \`A --> B[文本]\` 或 \`D -->|条件| E[文本]\`
+            - 禁止重复节点定义、多次等价的 classDef；相同样式须合并为单一定义。
+            - 保留并规范化 classDef 与 class 使用，样式命名应语义化（如 success, failure, warning, process）。
+            - 移除自指或重复循环（如 B --> B），但保留必要的逻辑循环。
+            - 同名不同文本的节点需拆分为独立编号节点（如 A1, A2），并保留原连线文本。
+            - 输出不得包含空行、注释或非 Mermaid 内容，保证可直接渲染。
+            - 节点顺序保持逻辑清晰（入口节点优先），无需完全复原原文件顺序。
+            
+            输出示例（严格格式）：
+            flowchart TD
+            A[用户打开App] --> B[显示二维码]
+            B --> C[用户扫码]
+            C --> D{扫码成功?}
+            D -->|是| E[登录]
+            D -->|否| F[重试]
+            classDef success fill:#d4edda,stroke:#155724,color:#155724
+            class E success
+                `;
+                const {
+                    optimizedCode,
+                    error
+                } = await optimizeMermaidCode(code, mermaidOptimizationPrompt, changeStreamCode, groupList);
+                changeMermaidCode(optimizedCode);
+            }
+        } else if (diagramType === "sequenceDiagram") {
+            console.log(elements)
+        }
+        setIsGenerating(false);
+        setIsStreaming(false);
     }
 
     return (
@@ -360,7 +443,7 @@ const ExcalidrawRenderer = forwardRef(({
                         onClick={() => setIsTypeDialogOpen(true)}
                         className="h-7 gap-1 text-xs px-2"
                         title="手动调整图像后反向更新 Mermaid Code"
-                        disabled={!excalidrawAPI||!parentDiagramType}
+                        disabled={!excalidrawAPI || !parentDiagramType}
                     >
                         <RefreshCw className="h-3.5 w-3.5"/>
                         <span className="hidden sm:inline">更新 Mermaid Code</span>
