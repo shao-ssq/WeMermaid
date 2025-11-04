@@ -1,6 +1,6 @@
 "use client";
 
-import {useState, useEffect, useCallback, forwardRef, useImperativeHandle} from "react";
+import {useState, useEffect, useCallback, forwardRef, useImperativeHandle, useRef} from "react";
 import dynamic from "next/dynamic";
 import {parseMermaidToExcalidraw} from "@excalidraw/mermaid-to-excalidraw";
 import {toast} from "sonner";
@@ -31,6 +31,7 @@ import {
 import "@excalidraw/excalidraw/index.css";
 import {convertToExcalidrawElements, exportToBlob, Footer} from "@excalidraw/excalidraw";
 import {generateMermaidFromText, optimizeMermaidCode, optimizeMermaidCodeNotStream} from "@/lib/ai-service";
+
 
 // Dynamically import Excalidraw to avoid SSR issues
 const Excalidraw = dynamic(
@@ -163,6 +164,9 @@ const ExcalidrawRenderer = forwardRef(({
     const [selectedDiagramType, setSelectedDiagramType] = useState("flowchart");
     let [parentDiagramType, setParentDiagramType] = useState(false);
 
+    const [sceneKey, setSceneKey] = useState(0);
+    const pendingFitSceneKeyRef = useRef(null);
+
     // 监听全局事件
     useEffect(() => {
         if (mermaidCode.startsWith("flowchart TD")) {
@@ -195,13 +199,17 @@ const ExcalidrawRenderer = forwardRef(({
     }, [excalidrawAPI, mermaidCode]);
 
     const renderMermaidContent = useCallback(async () => {
-        if (!excalidrawAPI || !mermaidCode || mermaidCode.trim() === "") {
+        if (!mermaidCode || mermaidCode.trim() === "") {
             setExcalidrawElements([]);
             setExcalidrawFiles({});
             setRenderError(null);
-            if (excalidrawAPI) {
-                excalidrawAPI.resetScene();
-            }
+            setExcalidrawAPI(null);
+            setSceneKey((k) => {
+                const next = k + 1;
+                // 空内容不需要适配
+                pendingFitSceneKeyRef.current = null;
+                return next;
+            });
             return;
         }
 
@@ -216,11 +224,12 @@ const ExcalidrawRenderer = forwardRef(({
 
             setExcalidrawElements(convertedElements);
             setExcalidrawFiles(files);
-            excalidrawAPI.updateScene({
-                elements: convertedElements,
-            });
-            excalidrawAPI.scrollToContent(convertedElements, {
-                fitToContent: true,
+            setExcalidrawAPI(null);
+            setSceneKey((k) => {
+                const next = k + 1;
+                // 标记该场景需要在首次变更后自动适配
+                pendingFitSceneKeyRef.current = next;
+                return next;
             });
 
             // 通知父组件没有错误
@@ -240,11 +249,29 @@ const ExcalidrawRenderer = forwardRef(({
         } finally {
             setIsRendering(false);
         }
-    }, [excalidrawAPI, mermaidCode]);
+    }, [mermaidCode]);
 
     useEffect(() => {
         renderMermaidContent();
     }, [renderMermaidContent]);
+
+    // 通过 onChange 的首次回调来保证 Excalidraw 完成挂载和布局后再适配
+    // 以及在 sceneKey 或 API 就绪时也尝试进行一次自动适配（双保险）
+    useEffect(() => {
+        if (!excalidrawAPI) return;
+        if (renderError) return;
+        if (pendingFitSceneKeyRef.current !== sceneKey) return;
+        // 等待一帧，确保容器尺寸稳定
+        const raf = requestAnimationFrame(() => {
+            try {
+                excalidrawAPI.scrollToContent(undefined, { fitToContent: true });
+            } catch (e) {
+                console.error('Auto fit in effect failed:', e);
+            }
+            pendingFitSceneKeyRef.current = null;
+        });
+        return () => cancelAnimationFrame(raf);
+    }, [excalidrawAPI, sceneKey, renderError]);
 
     useImperativeHandle(ref, () => ({handleFitToScreen, excalidrawAPI, excalidrawElements}))
     useImperativeHandle(ref, () => ({handleDownload, excalidrawAPI, excalidrawElements, excalidrawFiles}))
@@ -572,14 +599,38 @@ const ExcalidrawRenderer = forwardRef(({
 
                 <div className="w-full h-full">
                     <Excalidraw
+                        key={sceneKey}
                         initialData={{
+                            elements: excalidrawElements,
                             appState: {
                                 viewBackgroundColor: "#fafafa",
                                 currentItemFontFamily: 1,
                             },
+                            files: excalidrawFiles,
+                            scrollToContent: excalidrawElements.length > 0,
                         }
                         }
                         excalidrawAPI={(api) => setExcalidrawAPI(api)}
+                        onChange={(elements) => {
+                            // 仅在新场景挂载后的首次变更时自动适配一次
+                            if (
+                                pendingFitSceneKeyRef.current === sceneKey &&
+                                excalidrawAPI &&
+                                elements &&
+                                elements.length > 0 &&
+                                !renderError
+                            ) {
+                                // 等待一帧，确保容器尺寸与布局稳定
+                                requestAnimationFrame(() => {
+                                    try {
+                                        excalidrawAPI.scrollToContent(undefined, { fitToContent: true });
+                                    } catch (e) {
+                                        console.error('Auto fit in onChange failed:', e);
+                                    }
+                                });
+                                pendingFitSceneKeyRef.current = null;
+                            }
+                        }}
                     >
                         <Footer>
                         </Footer>
