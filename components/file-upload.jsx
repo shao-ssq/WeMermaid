@@ -16,7 +16,7 @@ export function FileUpload({ onTextExtracted }) {
       if (acceptedFiles.length === 0) return;
 
       const file = acceptedFiles[0]; // Only process the first file
-      
+
       // Check file type
       const fileExt = file.name.split('.').pop().toLowerCase();
       if (!['txt', 'md', 'docx'].includes(fileExt)) {
@@ -31,20 +31,21 @@ export function FileUpload({ onTextExtracted }) {
       }
 
       setIsProcessing(true);
-      
+
       try {
         const { text, error } = await extractTextFromFile(file);
-        
+
         if (error) {
           toast.error(error);
           return;
         }
-        
+
         if (!text || text.trim() === "") {
           toast.error("无法从文件中提取文本内容。");
           return;
         }
-        
+
+        console.log("success")
         toast.success(`已成功从 ${file.name} 提取文本`);
         onTextExtracted(text);
       } catch (error) {
@@ -113,4 +114,4 @@ export function FileUpload({ onTextExtracted }) {
       </div>
     </div>
   );
-} 
+}
